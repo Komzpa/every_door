@@ -43,18 +43,30 @@ class MapDragCreateButton extends StatelessWidget {
           onDragEnd: (details) {
             const offset = Offset(-kArrowSize / 2, -2.0);
             final pos = Offset(details.offset.dx, details.offset.dy);
-            // To adjust offset, we need to know the location of everything.
-            final globalMapOriginTr = map.mapKey?.currentContext!
-                .findRenderObject()!
-                .getTransformTo(null)
-                .getTranslation();
-            final globalMapOrigin = globalMapOriginTr == null
-                ? Offset(0.0, 0.0)
-                : Offset(globalMapOriginTr.x, globalMapOriginTr.y);
-            _logger.fine(
-                'global: $globalMapOrigin, drop offset: ${pos - offset}.');
-            final location = map.mapController?.camera
-                .offsetToCrs(pos - offset + globalMapOrigin);
+            // Determine the map render box to convert global coordinates.
+            final renderBox =
+                map.mapKey?.currentContext?.findRenderObject() as RenderBox?;
+            if (renderBox == null) return;
+
+            // Arrow tip position in global coordinates.
+            final dropGlobal = pos - offset;
+            // Convert to coordinates relative to the map widget.
+            final dropLocal = renderBox.globalToLocal(dropGlobal);
+
+            // Verify that the drop point is inside the visible map area.
+            final size = renderBox.size;
+            final inside = dropLocal.dx >= 0 &&
+                dropLocal.dy >= 0 &&
+                dropLocal.dx <= size.width &&
+                dropLocal.dy <= size.height;
+            if (!inside) {
+              _logger.fine('Drop outside map view: $dropLocal, size: $size');
+              return;
+            }
+
+            _logger.fine('Drop at local offset: $dropLocal');
+            final location =
+                map.mapController?.camera.offsetToCrs(dropLocal);
             if (onDragEnd != null && location != null) onDragEnd!(location);
           },
           feedbackOffset: Offset(kArrowSize / 2, 70.0),
