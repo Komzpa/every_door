@@ -211,29 +211,34 @@ class HoursFragment implements Comparable {
 
   void _fixAndSortBreaks() {
     if (interval == null) breaks.clear();
-    if (breaks.isEmpty) return;
+    if (breaks.isEmpty || interval == null) return;
 
-    // No we cannot process any breaks crossing midnight. Too hard.
-    // And also remove breaks outside the interval.
-    breaks.removeWhere((b) => b.crossesMidnight || !interval!.intersects(b));
-    breaks.sort();
+    // Remove breaks outside the interval.
+    breaks.removeWhere((b) => !interval!.intersects(b));
 
-    // Merge overlapping breaks.
+    int startMinutes = interval!.start.hour * 60 + interval!.start.minute;
+    int normalize(StringTime t) {
+      int m = t.hour * 60 + t.minute;
+      if (interval!.crossesMidnight && m < startMinutes) m += 24 * 60;
+      return m;
+    }
+
+    breaks.sort((a, b) => normalize(a.start).compareTo(normalize(b.start)));
+
+    // Merge overlapping breaks using normalized times.
     for (int i = 0; i < breaks.length - 1;) {
-      // Note that [i].start <= [i+1].start.
-      if (breaks[i].end >= breaks[i + 1].start) {
-        // If [i-1] is fully contained in [i] then just delete it.
-        if (breaks[i].end < breaks[i + 1].end)
+      if (normalize(breaks[i].end) >= normalize(breaks[i + 1].start)) {
+        if (normalize(breaks[i].end) < normalize(breaks[i + 1].end))
           breaks[i] = HoursInterval(breaks[i].start, breaks[i + 1].end);
         breaks.removeAt(i + 1);
-      } else
+      } else {
         i++;
+      }
     }
 
     // Trim interval using breaks overlapping its edges.
     for (int i = 0; i < breaks.length;) {
       if (breaks[i].contains(interval!)) {
-        // Did we get a break too large after merging?
         interval = null;
         breaks.clear();
         return;
@@ -243,8 +248,9 @@ class HoursFragment implements Comparable {
       } else if (breaks[i].containsTime(interval!.end)) {
         interval = HoursInterval(interval!.start, breaks[i].start);
         breaks.removeAt(i);
-      } else
+      } else {
         i++;
+      }
     }
   }
 
@@ -272,14 +278,42 @@ class HoursFragment implements Comparable {
   String timeToString() {
     if (interval == null) return 'off';
 
-    List<StringTime> hours = [
-      for (final b in breaks) ...[b.start, b.end]
+    int startMinutes = interval!.start.hour * 60 + interval!.start.minute;
+    int normalize(StringTime t) {
+      int m = t.hour * 60 + t.minute;
+      if (interval!.crossesMidnight && m < startMinutes) m += 24 * 60;
+      return m;
+    }
+
+    String format(int m) {
+      bool is24 = false;
+      if (m >= 24 * 60) {
+        if (m == 24 * 60) is24 = true;
+        m -= 24 * 60;
+      }
+      int h = m ~/ 60;
+      int mm = m % 60;
+      String str = '${h.toString().padLeft(2, '0')}:${mm.toString().padLeft(2, '0')}';
+      return is24 ? '24:00' : str;
+    }
+
+    int intervalEnd = normalize(interval!.end);
+    List<List<int>> br = [
+      for (final b in breaks) [normalize(b.start), normalize(b.end)]
     ];
-    hours.insert(0, interval!.start);
-    hours.add(interval!.end);
-    List<String> intervals = [
-      for (int i = 0; i < hours.length; i += 2) '${hours[i]}-${hours[i + 1]}'
-    ];
+    br.sort((a, b) => a[0].compareTo(b[0]));
+
+    List<String> intervals = [];
+    int cursor = startMinutes;
+    for (final b in br) {
+      if (b[0] > cursor) {
+        intervals.add('${format(cursor)}-${format(b[0])}');
+      }
+      cursor = b[1];
+    }
+    if (cursor < intervalEnd) {
+      intervals.add('${format(cursor)}-${format(intervalEnd)}');
+    }
     return intervals.join(',');
   }
 

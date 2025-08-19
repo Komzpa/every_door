@@ -132,7 +132,9 @@ void main() {
         [HoursInterval.str('10:00', '11:00'), HoursInterval.str('23:00', '00:30'),
         HoursInterval.str('02:00', '03:00')]);
     expect(fragment.interval, equals(HoursInterval.str('19:00', '02:00')));
-    expect(fragment.breaks, isEmpty);
+    expect(fragment.breaks.length, equals(1));
+    expect(fragment.breaks.first, equals(HoursInterval.str('23:00', '00:30')));
+    expect(fragment.timeToString(), equals('19:00-23:00,00:30-02:00'));
 
     fragment = HoursFragment(Weekdays.fullWeek(), HoursInterval.str('19:00', '25:00'),
       [HoursInterval.str('00:00', '00:30'), HoursInterval.str('00:50', '01:10')]);
