@@ -7,7 +7,7 @@ import 'package:every_door/providers/editor_settings.dart';
 import 'package:every_door/providers/notes.dart';
 import 'package:every_door/providers/uploader.dart';
 import 'package:every_door/screens/modes/definitions/base.dart';
-import 'package:every_door/screens/settings/changeset_pane.dart';
+import 'package:every_door/screens/settings/changes.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:every_door/generated/l10n/app_localizations.dart'
@@ -15,16 +15,6 @@ import 'package:every_door/generated/l10n/app_localizations.dart'
 
 class BrowserNavigationBar extends ConsumerWidget {
   const BrowserNavigationBar({super.key});
-
-  Future<bool> _showChangesetPane(BuildContext context) async {
-    final result = await showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      enableDrag: false,
-      builder: (context) => ChangesetSheetPane(),
-    );
-    return result != false;
-  }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -54,17 +44,14 @@ class BrowserNavigationBar extends ConsumerWidget {
       dataButton = IconButton(
         onPressed: apiStatus != ApiStatus.idle
             ? null
-            : () async {
-                final review = ref.read(editorSettingsProvider).changesetReview;
-                bool needAsk = review == ChangesetReview.always ||
-                    (haveHashtags && review == ChangesetReview.withTags);
-                bool upload = true;
-                if (needAsk) {
-                  if (!await _showChangesetPane(context)) upload = false;
-                }
-                // We won't lose the context here.
-                // ignore: use_build_context_synchronously
-                if (upload) ref.read(uploaderProvider).upload(context);
+            : () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => ChangeListPage(),
+                    fullscreenDialog: true,
+                  ),
+                );
               },
         icon: Stack(children: [
           Icon(Icons.upload),

@@ -7,11 +7,14 @@ import 'package:every_door/models/amenity.dart';
 import 'package:every_door/models/note.dart';
 import 'package:every_door/providers/api_status.dart';
 import 'package:every_door/providers/changes.dart';
+import 'package:every_door/providers/changeset_tags.dart';
 import 'package:every_door/providers/need_update.dart';
 import 'package:every_door/providers/notes.dart';
 import 'package:every_door/providers/osm_api.dart';
 import 'package:every_door/providers/uploader.dart';
+import 'package:every_door/providers/editor_settings.dart';
 import 'package:every_door/screens/editor.dart';
+import 'package:every_door/screens/settings/changeset_pane.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:share_plus/share_plus.dart';
@@ -61,6 +64,16 @@ class ChangeItem {
 
 class _ChangeListPageState extends ConsumerState {
   List<ChangeItem> _changeList = [];
+
+  Future<bool> _showChangesetPane(BuildContext context) async {
+    final result = await showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      enableDrag: false,
+      builder: (context) => ChangesetSheetPane(),
+    );
+    return result != false;
+  }
 
   @override
   initState() {
@@ -226,8 +239,23 @@ class _ChangeListPageState extends ConsumerState {
             IconButton(
               onPressed: ref.watch(apiStatusProvider) != ApiStatus.idle
                   ? null
-                  : () {
-                      ref.read(uploaderProvider).upload(context);
+                  : () async {
+                      final review =
+                          ref.read(editorSettingsProvider).changesetReview;
+                      final haveHashtags = ref
+                          .read(changesetTagsProvider)
+                          .getHashtags()
+                          .isNotEmpty;
+                      bool needAsk = review == ChangesetReview.always ||
+                          (haveHashtags && review == ChangesetReview.withTags);
+                      bool upload = true;
+                      if (needAsk) {
+                        if (!await _showChangesetPane(context)) upload = false;
+                      }
+                      if (upload) {
+                        await ref.read(uploaderProvider).upload(context);
+                        if (context.mounted) Navigator.pop(context);
+                      }
                     },
               icon: Icon(Icons.upload),
               tooltip: loc.navUpload,
