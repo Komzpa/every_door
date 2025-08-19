@@ -118,7 +118,8 @@ class OsmChange extends ChangeNotifier implements Comparable {
       (element?.isPoint ?? true) &&
       (element == null || element?.isMember == IsMember.no);
   bool get canMove =>
-      (element?.isPoint ?? true) && (element?.isMember != IsMember.way);
+      (element?.isPoint ?? true) &&
+      (element?.isMember != IsMember.way || hasTag('entrance'));
   String? get mainKey => _mainKey;
 
   void revert() {
