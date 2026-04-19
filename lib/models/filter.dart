@@ -14,7 +14,7 @@ class PoiFilter {
   final bool includeNoData; // TODO: what does this even mean
   final bool notChecked;
 
-  PoiFilter(
+  const PoiFilter(
       {this.floor,
       this.address,
       this.includeNoData = true,

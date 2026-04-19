@@ -16,7 +16,7 @@ class AreaStatusPanel extends ConsumerWidget {
     final statusWatch = ref.watch(areaStatusProvider);
     if (statusWatch.hasError) return Container();
 
-    final areaStatus = statusWatch.valueOrNull;
+    final areaStatus = statusWatch.value;
     final apiStatus = ref.watch(apiStatusProvider);
     if (areaStatus == null ||
         areaStatus == AreaStatus.fresh ||

@@ -94,7 +94,7 @@ class RoadNameProvider {
     // Add addresses from edited objects.
     const distance = DistanceEquirectangular();
     final changedElements = _ref
-        .read(changesProvider)
+        .read(changesProvider.notifier)
         .all()
         .where((element) =>
             distance(location, element.location) <= radius &&

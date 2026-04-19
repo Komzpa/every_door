@@ -33,7 +33,7 @@ class BrowserNavigationBar extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     ref.watch(editorModeProvider); // to update the widget
     final apiStatus = ref.watch(apiStatusProvider);
-    final hasChangesToUpload = ref.watch(changesProvider).haveNoErrorChanges();
+    final hasChangesToUpload = ref.watch(changesProvider.notifier).haveNoErrorChanges();
     final hasNotesToUpload = ref.watch(notesProvider) > 0;
     final double bottomPadding = MediaQuery.of(context).padding.bottom;
     final bool haveHashtags =

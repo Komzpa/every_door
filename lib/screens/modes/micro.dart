@@ -105,13 +105,13 @@ class _MicromappingPageState extends ConsumerState<MicromappingPane> {
       await widget.def
           .openEditor(context: context, element: amenitiesAtCenter.first);
       // When finished, reset zoomed in state.
-      ref.read(microZoomedInProvider.notifier).state = null;
+      ref.read(microZoomedInProvider.notifier).reset();
       _microPOI = null;
       updateNearest();
     } else {
       // Multiple amenities: zoom in and enhance.
-      ref.read(microZoomedInProvider.notifier).state = LatLngBounds.fromPoints(
-          amenitiesAtCenter.map((a) => a.location).toList());
+      ref.read(microZoomedInProvider.notifier).set(LatLngBounds.fromPoints(
+          amenitiesAtCenter.map((a) => a.location).toList()));
       // Disable tracking.
       ref.read(trackingProvider.notifier).disable();
       // updateNearest(forceLocation: area.center);
@@ -186,7 +186,7 @@ class _MicromappingPageState extends ConsumerState<MicromappingPane> {
           amenities: _microPOI ?? const [],
           describer: widget.def.describer,
           onTap: (amenity) {
-            ref.read(microZoomedInProvider.notifier).state = null;
+            ref.read(microZoomedInProvider.notifier).reset();
             widget.def.openEditor(context: context, element: amenity);
           },
         ),
@@ -262,11 +262,11 @@ class _MicromappingPageState extends ConsumerState<MicromappingPane> {
           ),
           alignment: leftHand ? Alignment.bottomLeft : Alignment.bottomRight,
           onDragEnd: (pos) {
-            ref.read(microZoomedInProvider.notifier).state = null;
+            ref.read(microZoomedInProvider.notifier).reset();
             widget.def.openEditor(context: context, location: pos);
           },
           onTap: () async {
-            ref.read(microZoomedInProvider.notifier).state = null;
+            ref.read(microZoomedInProvider.notifier).reset();
             final location = await Navigator.push(
               context,
               MaterialPageRoute(

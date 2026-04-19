@@ -146,7 +146,7 @@ class _PluginRepositoryPageState extends ConsumerState<PluginRepositoryPage> {
         },
         child: ListView(
           children: [
-            if (plugins.valueOrNull?.isNotEmpty ?? false)
+            if (plugins.value?.isNotEmpty ?? false)
               Padding(
                 padding: const EdgeInsets.symmetric(
                   vertical: 16.0,

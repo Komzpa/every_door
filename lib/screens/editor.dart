@@ -219,7 +219,7 @@ class _PoiEditorPageState extends ConsumerState<PoiEditorPage> {
       // 2. remove the amenity
       if (widget.amenity != null) {
         // It's new by [OsmChange.isFixmeNote] definition.
-        ref.read(changesProvider).deleteChange(amenity);
+        ref.read(changesProvider.notifier).deleteChange(amenity);
       }
     } else {
       final fullTags = amenity.getFullTags();
@@ -232,7 +232,7 @@ class _PoiEditorPageState extends ConsumerState<PoiEditorPage> {
         ref.read(lastPresetsProvider).registerPreset(widget.preset!, fullTags);
       }
       // Save changes and close.
-      final changes = ref.read(changesProvider);
+      final changes = ref.read(changesProvider.notifier);
       changes.saveChange(amenity);
       if (amenity.hasTag('addr:floor'))
         ref.read(osmDataProvider).updateFloorNumbering(amenity.location);
@@ -244,7 +244,7 @@ class _PoiEditorPageState extends ConsumerState<PoiEditorPage> {
   void deleteAndClose() {
     if (widget.amenity != null) {
       // No use deleting an amenity that just have been created.
-      final changes = ref.read(changesProvider);
+      final changes = ref.read(changesProvider.notifier);
       if (amenity.isNew) {
         changes.deleteChange(amenity);
       } else {

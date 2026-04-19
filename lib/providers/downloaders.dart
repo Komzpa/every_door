@@ -127,13 +127,16 @@ class OsmDataDownloadNotifier extends Notifier<DownloadingState> {
   }
 }
 
-class TileDownloadNotifier extends FamilyNotifier<DownloadingState, Imagery> {
+class TileDownloadNotifier extends Notifier<DownloadingState> {
   static final _logger = Logger('TileDownloadNotifier');
 
+  final Imagery arg;
   bool _needStop = false;
 
+  TileDownloadNotifier(this.arg);
+
   @override
-  DownloadingState build(Imagery imagery) => DownloadingState.idle();
+  DownloadingState build() => DownloadingState.idle();
 
   bool canDownload() {
     return arg is TmsImagery ||

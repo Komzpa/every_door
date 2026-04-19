@@ -4,25 +4,26 @@
 import 'package:every_door/models/amenity.dart';
 import 'package:every_door/models/osm_element.dart';
 import 'package:every_door/providers/database.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:logging/logging.dart';
 import 'package:sqflite/sqflite.dart';
 
-final changesProvider = ChangeNotifierProvider((ref) => ChangesProvider(ref));
+/// Keeps changes to OSM elements that are persisted in a separate table.
+/// All changed are loaded when the app starts, to simplify processing.
+/// The value is a total number of changes. Null is they haven't been loaded yet.
+final changesProvider = NotifierProvider<ChangesProvider, int?>(ChangesProvider.new);
 
-class ChangesProvider extends ChangeNotifier {
-  final Ref _ref;
+class ChangesProvider extends Notifier<int?> {
   final Map<OsmId, OsmChange> _changes = {};
   final Map<String, OsmChange> _new = {};
-  bool loaded = false;
 
   static final _logger = Logger('ChangesProvider');
 
-  ChangesProvider(this._ref);
+  @override
+  int? build() => 0;
 
   Future<void> loadChanges() async {
-    final database = await _ref.read(databaseProvider).database;
+    final database = await ref.read(databaseProvider).database;
     final rows = await database.rawQuery("""
       select * from ${OsmChange.kTableName} c
       left join ${OsmElement.kTableName} e on c.osmid = e.osmid
@@ -52,12 +53,15 @@ class ChangesProvider extends ChangeNotifier {
       else
         _changes[e.id] = e;
     }
-    loaded = true;
-    notifyListeners();
+    _updateLength();
   }
 
   void _ensureLoaded() {
-    if (!loaded) throw StateError("Changes were not loaded");
+    if (state == null) throw StateError("Changes were not loaded");
+  }
+
+  void _updateLength() {
+    state = length;
   }
 
   OsmChange changeFor(OsmElement element, [bool storeNew = true]) {
@@ -124,13 +128,13 @@ class ChangesProvider extends ChangeNotifier {
 
   Future<void> _addChange(OsmChange change) async {
     _ensureLoaded();
-    final database = await _ref.read(databaseProvider).database;
+    final database = await ref.read(databaseProvider).database;
     change.updated = DateTime.now();
     if (change.isNew)
       _new[change.databaseId] = change;
     else
       _changes[change.id] = change;
-    notifyListeners();
+    _updateLength();
     await database.insert(
       OsmChange.kTableName,
       change.toJson(),
@@ -147,9 +151,9 @@ class ChangesProvider extends ChangeNotifier {
       if (!_changes.containsKey(change.id)) return;
       _changes.remove(change.id);
     }
-    notifyListeners();
+    _updateLength();
 
-    final database = await _ref.read(databaseProvider).database;
+    final database = await ref.read(databaseProvider).database;
     await database.delete(
       OsmChange.kTableName,
       where: 'id = ?',
@@ -174,7 +178,7 @@ class ChangesProvider extends ChangeNotifier {
           (idSet.isEmpty || idSet.contains(key.toString())));
     }
 
-    final database = await _ref.read(databaseProvider).database;
+    final database = await ref.read(databaseProvider).database;
     final keepIds =
         _changes.keys.map((e) => e.toString()).followedBy(_new.keys).toList();
     if (keepIds.isEmpty) {
@@ -194,7 +198,7 @@ class ChangesProvider extends ChangeNotifier {
           "with t(i) as (values $values) delete from ${OsmChange.kTableName} where osmid not in (select i from t)");
     }
 
-    notifyListeners();
+    _updateLength();
   }
 
   bool haveNoErrorChanges() {

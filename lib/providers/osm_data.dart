@@ -22,10 +22,11 @@ import 'package:every_door/providers/database.dart';
 import 'package:every_door/providers/osm_api.dart';
 import 'package:every_door/providers/road_names.dart';
 import 'package:fast_geohash/fast_geohash_str.dart';
-import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_map/flutter_map.dart' show LatLngBounds;
 import 'package:every_door/constants.dart';
 import 'package:every_door/models/amenity.dart';
+import 'package:flutter_riverpod/legacy.dart';
 import 'package:latlong2/latlong.dart' show LatLng;
 import 'package:logging/logging.dart';
 import 'package:sqflite/sqflite.dart';
@@ -36,14 +37,14 @@ final osmDataProvider = ChangeNotifierProvider((ref) => OsmDataHelper(ref));
 
 class OsmDataHelper extends ChangeNotifier {
   static final _logger = Logger('OsmDataHelper');
-  final Ref _ref;
+  final Ref ref;
   int _length = 0;
   int _obsoleteLength = 0;
   Set<StreetAddress> _addressesWithFloors = {};
   bool capitalizeNames = kCapitalizeNames;
   List<Floor> floorNumbering = [];
 
-  OsmDataHelper(this._ref) {
+  OsmDataHelper(this.ref) {
     _updateLength();
     _updateCapitalizeNames();
     updateFloorNumbering();
@@ -55,7 +56,7 @@ class OsmDataHelper extends ChangeNotifier {
 
   /// Removes super-obsolete OSM elements from the database.
   Future<int> _purgeElements(DateTime before) async {
-    final database = await _ref.read(databaseProvider).database;
+    final database = await ref.read(databaseProvider).database;
     // Keep elements that are referenced from the changes table.
     int count = await database.delete(
       OsmElement.kTableName,
@@ -69,7 +70,7 @@ class OsmDataHelper extends ChangeNotifier {
   }
 
   Future<int> getObsoleteDataCount([DateTime? before]) async {
-    final database = await _ref.read(databaseProvider).database;
+    final database = await ref.read(databaseProvider).database;
     final beforeTimestamp =
         before ?? DateTime.now().subtract(kSuperObsoleteData);
     final result = await database.query(
@@ -87,24 +88,24 @@ class OsmDataHelper extends ChangeNotifier {
     final beforeTimestamp =
         all ? DateTime.now() : DateTime.now().subtract(kSuperObsoleteData);
     final count = await _purgeElements(beforeTimestamp);
-    await _ref.read(downloadedAreaProvider).purgeAreas(beforeTimestamp);
-    await _ref.read(roadNameProvider).purgeNames(beforeTimestamp);
+    await ref.read(downloadedAreaProvider.notifier).purgeAreas(beforeTimestamp);
+    await ref.read(roadNameProvider).purgeNames(beforeTimestamp);
     return count;
   }
 
   Future _updateLength() async {
-    final database = await _ref.read(databaseProvider).database;
+    final database = await ref.read(databaseProvider).database;
     final result = await database
         .rawQuery("select count(*) as cnt from ${OsmElement.kTableName}");
     _length = firstIntValue(result) ?? 0;
     _obsoleteLength = await getObsoleteDataCount();
-    notifyListeners();
+    ref.notifyListeners();
   }
 
   /// Saves all the downloaded elements and the bounding box to the database.
   Future storeElements(
       Iterable<OsmElement> elements, LatLngBounds? bounds) async {
-    final database = await _ref.read(databaseProvider).database;
+    final database = await ref.read(databaseProvider).database;
     await database.transaction((txn) async {
       // Delete objects in the area, to account for deletions.
       if (bounds != null) {
@@ -132,8 +133,8 @@ class OsmDataHelper extends ChangeNotifier {
     });
 
     if (bounds != null) {
-      await _ref
-          .read(downloadedAreaProvider)
+      await ref
+          .read(downloadedAreaProvider.notifier)
           .addArea(bounds, elements.first.source);
     }
 
@@ -144,7 +145,7 @@ class OsmDataHelper extends ChangeNotifier {
 
   List<OsmChange> _wrapInChange(Iterable<OsmElement> elements,
       [bool addNew = true]) {
-    final changes = _ref.read(changesProvider);
+    final changes = ref.read(changesProvider.notifier);
     final result = elements
         .map((e) => changes.changeFor(e))
         .where((change) => !change.isDeleted)
@@ -155,7 +156,7 @@ class OsmDataHelper extends ChangeNotifier {
 
   Future<List<OsmChange>> _queryElements(List<String> hashes) async {
     if (hashes.isEmpty) return [];
-    final database = await _ref.read(databaseProvider).database;
+    final database = await ref.read(databaseProvider).database;
     final placeholders = List.generate(hashes.length, (index) => "?").join(",");
     final rows = await database.query(
       OsmElement.kTableName,
@@ -182,14 +183,14 @@ class OsmDataHelper extends ChangeNotifier {
   /// Queries a single element from the downloaded objects
   /// and returns an [OsmChange] for it, even if it was deleted.
   Future<OsmChange?> getElement(OsmId id) async {
-    final database = await _ref.read(databaseProvider).database;
+    final database = await ref.read(databaseProvider).database;
     final rows = await database.query(
       OsmElement.kTableName,
       where: 'osmid = ?',
       whereArgs: [id.toString()],
     );
     if (rows.isEmpty) return null;
-    final changes = _ref.read(changesProvider);
+    final changes = ref.read(changesProvider.notifier);
     return changes.changeFor(OsmElement.fromJson(rows.first));
   }
 
@@ -202,7 +203,7 @@ class OsmDataHelper extends ChangeNotifier {
 
   Future<List<OsmElement>> _getAddressedElementsAround(LatLng location,
       {int radius = kVisibilityRadius}) async {
-    final database = await _ref.read(databaseProvider).database;
+    final database = await ref.read(databaseProvider).database;
     final hashes = geohash.forCircle(location.latitude, location.longitude,
         radius.toDouble(), kGeohashPrecision);
     final placeholders = List.generate(hashes.length, (index) => "?").join(",");
@@ -215,8 +216,8 @@ class OsmDataHelper extends ChangeNotifier {
 
     // Add addresses from edited objects (nvm duplicates).
     const distance = DistanceEquirectangular();
-    final changedElements = _ref
-        .read(changesProvider)
+    final changedElements = ref
+        .read(changesProvider.notifier)
         .all()
         .where((element) =>
             distance(location, element.location) <= kVisibilityRadius &&
@@ -265,13 +266,13 @@ class OsmDataHelper extends ChangeNotifier {
   Future updateAddressesWithFloors() async {
     _addressesWithFloors.clear();
 
-    final database = await _ref.read(databaseProvider).database;
+    final database = await ref.read(databaseProvider).database;
     final rows = await database.query(OsmElement.kTableName,
         where: "tags like '%\"addr:floor\"%' or tags like '%\"level\"%'");
     final elements = rows.map((row) => OsmElement.fromJson(row)).toList();
 
-    final changedElements = _ref
-        .read(changesProvider)
+    final changedElements = ref
+        .read(changesProvider.notifier)
         .all()
         .where((element) => element['addr:housenumber'] != null)
         .map((e) => e.toElement(newId: -1));
@@ -303,7 +304,7 @@ class OsmDataHelper extends ChangeNotifier {
   /// If lower levels are missing or ambiguous, higher levels not returned.
   Future<List<Floor>> updateFloorNumbering([LatLng? location]) async {
     // TODO: this performs very slow, making the app slow on saving.
-    final database = await _ref.read(databaseProvider).database;
+    final database = await ref.read(databaseProvider).database;
     final hashes = location == null
         ? const []
         : geohash.forCircle(location.latitude, location.longitude,
@@ -320,7 +321,7 @@ class OsmDataHelper extends ChangeNotifier {
     final elementTags = elements.map((row) => row.tags).toList();
 
     // Add all new changes with floors
-    final changedElements = _ref.read(changesProvider).all();
+    final changedElements = ref.read(changesProvider.notifier).all();
     elementTags.addAll(changedElements.map((e) => e.getFullTags()));
 
     // Count addr:floor values for levels=0..kMaxFloor.
@@ -359,7 +360,7 @@ class OsmDataHelper extends ChangeNotifier {
 
   Future<List<Floor>> getFloorsAround(LatLng location,
       [StreetAddress? address]) async {
-    final database = await _ref.read(databaseProvider).database;
+    final database = await ref.read(databaseProvider).database;
     final hashes = geohash.forCircle(location.latitude, location.longitude,
         kVisibilityRadius.toDouble(), kGeohashPrecision);
     final placeholders = List.generate(hashes.length, (index) => "?").join(",");
@@ -374,7 +375,7 @@ class OsmDataHelper extends ChangeNotifier {
 
     // Add all new changes with floors
     const distance = DistanceEquirectangular();
-    final changedElements = _ref.read(changesProvider).all().where(
+    final changedElements = ref.read(changesProvider.notifier).all().where(
         (element) => distance(location, element.location) <= kVisibilityRadius);
     elementTags.addAll(changedElements.map((e) => e.getFullTags()));
 
@@ -397,7 +398,7 @@ class OsmDataHelper extends ChangeNotifier {
 
   Future<List<String>> getOpeningHoursAround(LatLng location,
       {int limit = 10}) async {
-    final database = await _ref.read(databaseProvider).database;
+    final database = await ref.read(databaseProvider).database;
     final hashes = geohash.forCircle(location.latitude, location.longitude,
         kVisibilityRadius.toDouble(), kGeohashPrecision);
     final placeholders = List.generate(hashes.length, (index) => "?").join(",");
@@ -419,7 +420,7 @@ class OsmDataHelper extends ChangeNotifier {
 
   Future<List<String>> getPostcodesAround(LatLng location,
       {int limit = 3}) async {
-    final database = await _ref.read(databaseProvider).database;
+    final database = await ref.read(databaseProvider).database;
     final hashes = geohash.forCircle(location.latitude, location.longitude,
         kVisibilityRadius.toDouble(), kGeohashPrecision);
     final placeholders = List.generate(hashes.length, (index) => "?").join(",");
@@ -437,7 +438,7 @@ class OsmDataHelper extends ChangeNotifier {
 
     // Add all new changes with postcodes
     const distance = DistanceEquirectangular();
-    final changedElements = _ref.read(changesProvider).all().where((element) =>
+    final changedElements = ref.read(changesProvider.notifier).all().where((element) =>
         distance(location, element.location) <= kVisibilityRadius &&
         element['addr:postcode'] != null);
     elements.addAll(changedElements
@@ -448,7 +449,7 @@ class OsmDataHelper extends ChangeNotifier {
   }
 
   Future<Set<String>> getCardPaymentOptions(LatLng location) async {
-    final database = await _ref.read(databaseProvider).database;
+    final database = await ref.read(databaseProvider).database;
     final hashes = geohash.forCircle(location.latitude, location.longitude,
         kVisibilityRadius.toDouble(), kGeohashPrecision);
     final placeholders = List.generate(hashes.length, (index) => "?").join(",");
@@ -462,7 +463,7 @@ class OsmDataHelper extends ChangeNotifier {
 
     // Add all new changes with floors
     const distance = DistanceEquirectangular();
-    final changedElements = _ref.read(changesProvider).all().where(
+    final changedElements = ref.read(changesProvider.notifier).all().where(
         (element) => distance(location, element.location) <= kVisibilityRadius);
     elementTags.addAll(changedElements.map((e) => e.getFullTags()));
 
@@ -490,7 +491,7 @@ class OsmDataHelper extends ChangeNotifier {
   }
 
   Future<bool> _updateCapitalizeNames([LatLng? location]) async {
-    final database = await _ref.read(databaseProvider).database;
+    final database = await ref.read(databaseProvider).database;
     final List<String> hashes = location == null
         ? const []
         : geohash.forCircle(location.latitude, location.longitude,
@@ -535,7 +536,7 @@ class OsmDataHelper extends ChangeNotifier {
     final mainKey = clearPrefixNull(amenity.mainKey);
     if (mainKey == null) return null;
 
-    final database = await _ref.read(databaseProvider).database;
+    final database = await ref.read(databaseProvider).database;
     final hashes = geohash.forCircle(
         amenity.location.latitude,
         amenity.location.longitude,
@@ -586,7 +587,7 @@ class OsmDataHelper extends ChangeNotifier {
   }
 
   Future<Map<String, int>> getComboOptionsCount(String key) async {
-    final database = await _ref.read(databaseProvider).database;
+    final database = await ref.read(databaseProvider).database;
     final rows = await database.query(
       OsmElement.kTableName,
       where: "tags like ?",
@@ -615,30 +616,30 @@ class OsmDataHelper extends ChangeNotifier {
   }
 
   Future<int> _downloadMap(LatLngBounds bounds) async {
-    final api = _ref.read(osmApiProvider);
+    final api = ref.read(osmApiProvider);
     final roadNames = <RoadNameRecord>{};
     final List<OsmElement> elements =
         await api.map(bounds, roadNames: roadNames);
-    _ref.read(apiStatusProvider.notifier).state = ApiStatus.updatingDatabase;
+    ref.read(apiStatusProvider.notifier).set(ApiStatus.updatingDatabase);
     await storeElements(elements, bounds);
-    await _ref.read(roadNameProvider).storeNames(roadNames);
+    await ref.read(roadNameProvider).storeNames(roadNames);
     updateAddressesWithFloors();
     return elements.length;
   }
 
   Future<int> downloadAround(LatLng location) async {
-    _ref.read(apiStatusProvider.notifier).state = ApiStatus.downloading;
+    ref.read(apiStatusProvider.notifier).set(ApiStatus.downloading);
     try {
       return await _downloadMap(boundsFromRadius(location, kBigRadius));
     } on OsmApiError {
       return await _downloadMap(boundsFromRadius(location, kSmallRadius));
     } finally {
-      _ref.read(apiStatusProvider.notifier).state = ApiStatus.idle;
+      ref.read(apiStatusProvider.notifier).idle();
     }
   }
 
   Future<int> downloadInBounds(LatLngBounds bounds) async {
-    _ref.read(apiStatusProvider.notifier).state = ApiStatus.downloading;
+    ref.read(apiStatusProvider.notifier).set(ApiStatus.downloading);
     final boxes = ListQueue<LatLngBounds>(1);
     boxes.add(bounds);
     int downloaded = 0;
@@ -661,13 +662,13 @@ class OsmDataHelper extends ChangeNotifier {
     } on Exception catch (e) {
       _logger.severe('Error while bulk downloading OSM data: $e');
     } finally {
-      _ref.read(apiStatusProvider.notifier).state = ApiStatus.idle;
+      ref.read(apiStatusProvider.notifier).idle();
     }
     return downloaded;
   }
 
   Future updateElement(OsmElement element) async {
-    final database = await _ref.read(databaseProvider).database;
+    final database = await ref.read(databaseProvider).database;
     await database.insert(
       OsmElement.kTableName,
       element.toJson(),
@@ -677,7 +678,7 @@ class OsmDataHelper extends ChangeNotifier {
   }
 
   Future deleteElement(OsmElement element) async {
-    final database = await _ref.read(databaseProvider).database;
+    final database = await ref.read(databaseProvider).database;
     await database.delete(
       OsmElement.kTableName,
       where: 'osmid = ?',

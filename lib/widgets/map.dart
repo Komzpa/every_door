@@ -143,11 +143,11 @@ class _CustomMapState extends ConsumerState<CustomMap> {
           if (isNavigating) {
             if (event.camera.zoom > kEditMinZoom) {
               // Switch navigation mode off
-              ref.read(navigationModeProvider.notifier).state = false;
+              ref.read(navigationModeProvider.notifier).disable();
             }
           } else if (event.camera.zoom < kEditMinZoom) {
             // Switch navigation mode on
-            ref.read(navigationModeProvider.notifier).state = true;
+            ref.read(navigationModeProvider.notifier).enable();
             ref.read(rotationProvider.notifier).reset();
           }
         }

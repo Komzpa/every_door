@@ -39,7 +39,7 @@ class _TileCacheDownloaderState extends ConsumerState<TileCacheDownloader> {
   }
 
   Future<void> _updateDownloadedAreas() async {
-    final areas = await ref.read(downloadedAreaProvider).getAllAreas();
+    final areas = await ref.read(downloadedAreaProvider.notifier).getAllAreas();
     _areas.clear();
     _areas.addAll(areas);
     setState(() {});

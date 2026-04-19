@@ -36,6 +36,11 @@ class PoiPane extends ConsumerStatefulWidget {
 class _PoiPaneState extends ConsumerState<PoiPane> {
   @override
   Widget build(BuildContext context) {
+    // If we don't do this, descriptions are not updated until we move the map.
+    ref.listen(needMapUpdateProvider, (o, n) {
+      _prepareDescriptions();
+    });
+
     return widget.amenities.isEmpty
         ? nothingAroundPane(context)
         : Container(
@@ -96,7 +101,7 @@ class _PoiPaneState extends ConsumerState<PoiPane> {
     setState(() {
       element.toggleCheck();
     });
-    final changes = ref.read(changesProvider);
+    final changes = ref.read(changesProvider.notifier);
     await changes.saveChange(element);
     ref.read(needMapUpdateProvider.notifier).trigger();
   }

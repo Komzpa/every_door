@@ -35,7 +35,7 @@ class SettingsPage extends ConsumerWidget {
     final hashtags = ref.watch(changesetTagsProvider.notifier).getHashtags();
     final loc = AppLocalizations.of(context)!;
 
-    final haveChanges = ref.watch(changesProvider).length > 0;
+    final haveChanges = (ref.watch(changesProvider) ?? 0) > 0;
     final haveNotes = ref.watch(notesProvider) > 0;
 
     return Scaffold(

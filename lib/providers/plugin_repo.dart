@@ -17,6 +17,11 @@ import 'package:path_provider/path_provider.dart';
 import 'package:yaml/yaml.dart';
 import 'package:every_door/helpers/yaml_map.dart';
 
+/// Manages plugins as physical entities on a device. That includes
+/// loading and unloading, parsing metadata and managing assets.
+/// This is basically a list of installed plugins in the settings,
+/// regardless of whether they are enabled. Use [pluginManagerProvider]
+/// for enabling and disabling plugins.
 final pluginRepositoryProvider =
     NotifierProvider<PluginRepository, List<Plugin>>(PluginRepository.new);
 
@@ -52,6 +57,9 @@ class PluginRepository extends Notifier<List<Plugin>> {
     }
 
     state = plugins;
+
+    // Enable plugins that were enabled before.
+    await ref.read(pluginManagerProvider.notifier).loadStateAndEnable();
 
     _installFromAssets();
     _installConstruction();

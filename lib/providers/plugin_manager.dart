@@ -32,6 +32,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:logging/logging.dart';
 import 'package:mbtiles/mbtiles.dart';
 
+/// Contains a list of _enabled_ plugins, as a set of string ids.
+/// Also manages it: one does not edit the set directly, but enables
+/// or disables plugins through this provider. See [pluginRepositoryProvider]
+/// for the plugin storage.
 final pluginManagerProvider =
     NotifierProvider<PluginManager, Set<String>>(PluginManager.new);
 
@@ -41,24 +45,7 @@ class PluginManager extends Notifier<Set<String>> {
   static const _kEnabledKey = 'plugins_enabled';
 
   @override
-  Set<String> build() {
-    ref.listen(pluginRepositoryProvider, (old, list) async {
-      if (old == null || old.isEmpty) {
-        await loadStateAndEnable();
-        return;
-      }
-
-      // When plugins are removed, we need to disable them.
-      for (final p in old) {
-        if (!list.contains(p)) await _disable(p);
-      }
-      // TODO: how does it work? looks like we'll be enabling plugin after plugin on load.
-      for (final p in list) {
-        if (!old.contains(p)) await _enable(p);
-      }
-    });
-    return {};
-  }
+  Set<String> build() => {};
 
   Future<void> loadStateAndEnable() async {
     // Read enabled list.

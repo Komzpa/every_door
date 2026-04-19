@@ -4,7 +4,20 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:every_door/generated/l10n/app_localizations.dart' show AppLocalizations;
 
-final apiStatusProvider = StateProvider<ApiStatus>((ref) => ApiStatus.idle);
+final apiStatusProvider = NotifierProvider<ApiStatusNotifier, ApiStatus>(ApiStatusNotifier.new);
+
+class ApiStatusNotifier extends Notifier<ApiStatus> {
+  @override
+  ApiStatus build() => ApiStatus.idle;
+
+  void set(ApiStatus status) {
+    state = status;
+  }
+
+  void idle() {
+    state = ApiStatus.idle;
+  }
+}
 
 enum ApiStatus {
   idle,

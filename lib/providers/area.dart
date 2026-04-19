@@ -6,19 +6,17 @@ import 'package:every_door/helpers/geometry/circle_bounds.dart';
 import 'package:every_door/models/osm_area.dart';
 import 'package:every_door/providers/database.dart';
 import 'package:every_door/providers/location.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter_map/flutter_map.dart' show LatLngBounds;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:latlong2/latlong.dart' show LatLng;
 
-final downloadedAreaProvider =
-    ChangeNotifierProvider((ref) => AreaProvider(ref));
+final downloadedAreaProvider = NotifierProvider<AreaProvider, bool>(AreaProvider.new);
 
 final areaStatusProvider = FutureProvider((ref) async {
-  final area = ref.watch(downloadedAreaProvider);
+  ref.watch(downloadedAreaProvider);
   final location = ref.watch(effectiveLocationProvider);
   final bbox = boundsFromRadius(location, kVisibilityRadius);
-  final status = await area.getAreaStatus(bbox);
+  final status = await ref.read(downloadedAreaProvider.notifier).getAreaStatus(bbox);
   return status;
 });
 
@@ -28,31 +26,30 @@ enum AreaStatus {
   fresh,
 }
 
-class AreaProvider extends ChangeNotifier {
-  final Ref _ref;
-
-  AreaProvider(this._ref);
+class AreaProvider extends Notifier<bool> {
+  @override
+  bool build() => false;
 
   Future addArea(LatLngBounds bounds, String source) async {
-    final database = await _ref.read(databaseProvider).database;
+    final database = await ref.read(databaseProvider).database;
     final area = OsmDownloadedArea(
         bounds: bounds, downloaded: DateTime.now(), source: source);
     await database.insert(OsmDownloadedArea.kTableName, area.toJson());
-    notifyListeners();
+    ref.notifyListeners();
   }
 
   Future purgeAreas(DateTime before) async {
-    final database = await _ref.read(databaseProvider).database;
+    final database = await ref.read(databaseProvider).database;
     await database.delete(
       OsmDownloadedArea.kTableName,
       where: 'downloaded < ?',
       whereArgs: [before.millisecondsSinceEpoch],
     );
-    notifyListeners();
+    ref.notifyListeners();
   }
 
   Future<List<LatLngBounds>> getAllAreas({bool withObsolete = false}) async {
-    final database = await _ref.read(databaseProvider).database;
+    final database = await ref.read(databaseProvider).database;
     final rows = await database.query(OsmDownloadedArea.kTableName);
     Iterable<OsmDownloadedArea> areas =
         rows.map((r) => OsmDownloadedArea.fromJson(r));
@@ -61,7 +58,7 @@ class AreaProvider extends ChangeNotifier {
   }
 
   Future<AreaStatus> getAreaStatus(LatLngBounds bounds) async {
-    final database = await _ref.read(databaseProvider).database;
+    final database = await ref.read(databaseProvider).database;
     final areas = await database.query(
       OsmDownloadedArea.kTableName,
       where: 'min_lat < ? and min_lon < ? and max_lat > ? and max_lon > ?',

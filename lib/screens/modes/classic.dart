@@ -134,11 +134,11 @@ class _ClassicModePageState extends ConsumerState<ClassicModePane> {
           ),
           alignment: leftHand ? Alignment.bottomLeft : Alignment.bottomRight,
           onDragEnd: (pos) {
-            ref.read(microZoomedInProvider.notifier).state = null;
+            ref.read(microZoomedInProvider.notifier).reset();
             widget.def.openEditor(context: context, location: pos);
           },
           onTap: () async {
-            ref.read(microZoomedInProvider.notifier).state = null;
+            ref.read(microZoomedInProvider.notifier).reset();
             final location = await Navigator.push(
               context,
               MaterialPageRoute(

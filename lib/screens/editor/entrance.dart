@@ -99,7 +99,7 @@ class _EntranceEditorPaneState extends ConsumerState<EntranceEditorPane> {
     ref.read(lastPresetsProvider).registerPreset(
         kEntrancePreset, entrance.getFullTags(),
         justTags: true);
-    final changes = ref.read(changesProvider);
+    final changes = ref.read(changesProvider.notifier);
     changes.saveChange(entrance);
     saved = true;
     ref.read(needMapUpdateProvider).trigger();
@@ -107,7 +107,7 @@ class _EntranceEditorPaneState extends ConsumerState<EntranceEditorPane> {
   }
 
   void deleteAndClose() {
-    final changes = ref.read(changesProvider);
+    final changes = ref.read(changesProvider.notifier);
     if (entrance.isNew) {
       changes.deleteChange(entrance);
     } else {

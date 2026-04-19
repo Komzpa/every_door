@@ -234,7 +234,7 @@ class _NotesPaneState extends ConsumerState<NotesPane> {
                     vertical: 24.0,
                   ),
                   onPressed: (_) {
-                    ref.read(drawingLockedProvider.notifier).state = false;
+                    ref.read(drawingLockedProvider.notifier).unlock();
                   },
                   icon: currentTool.icon,
                 ),
@@ -321,20 +321,19 @@ class _NotesPaneState extends ConsumerState<NotesPane> {
                       leftHand ? Alignment.bottomRight : Alignment.bottomLeft,
                   onChange: (newStyle) {
                     setState(() {
-                      ref.read(currentPaintToolProvider.notifier).state =
-                          newStyle;
+                      ref.read(currentPaintToolProvider.notifier).set(newStyle);
                     });
                   },
                   onLock: () {
-                    ref.read(drawingLockedProvider.notifier).state = true;
+                    ref.read(drawingLockedProvider.notifier).lock();
                   },
                 ),
-                if (!ref.watch(notesProvider.notifier).undoIsEmpty)
+                if (!ref.watch(notesProvider.notifier).undoStack.undoIsEmpty)
                   UndoButton(
                     alignment:
                         leftHand ? Alignment.bottomRight : Alignment.bottomLeft,
                     onTap: () {
-                      ref.read(notesProvider.notifier).undoChange();
+                      ref.read(notesProvider.notifier).undoStack.undoChange();
                     },
                   ),
               ],

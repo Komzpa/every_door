@@ -38,6 +38,7 @@ android {
     }
 
     compileSdk 36
+    ndkVersion flutter.ndkVersion
     namespace "info.zverev.ilya.every_door"
 
     compileOptions {
@@ -60,10 +61,10 @@ android {
     defaultConfig {
         applicationId "info.zverev.ilya.every_door"
         resValue "string", "app_name", "Every Door"
-        minSdkVersion flutter.minSdkVersion
+        minSdk flutter.minSdkVersion
         targetSdk 36
-        versionCode flutterVersionCode.toInteger()
-        versionName flutterVersionName
+        versionCode flutter.versionCode
+        versionName flutter.versionName
     }
 
     buildTypes {

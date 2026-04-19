@@ -26,20 +26,67 @@ import 'package:xml/xml.dart';
 import 'package:xml/xml_events.dart';
 
 final notesProvider = NotifierProvider<NotesProvider, int>(NotesProvider.new);
+
+/// Whether the user sees only their own notes. Not used currently anywhere.
 final ownScribblesProvider =
     NotifierProvider<OwnScribblesController, bool>(OwnScribblesController.new);
+
+/// Keeps the current selected paint tool for the Notes mode. Does not have
+/// a "no tool" option, must always be an instance of [DrawingStyle].
 final currentPaintToolProvider =
-    StateProvider<DrawingStyle>((_) => kToolScribble);
-final drawingLockedProvider = StateProvider<bool>((_) => true);
+    NotifierProvider<CurrentToolNotifier, DrawingStyle>(
+        CurrentToolNotifier.new);
+
+/// Whether drawing is locked and dragging pans the map instead of drawing.
+final drawingLockedProvider =
+    NotifierProvider<DrawingLockedNotifier, bool>(DrawingLockedNotifier.new);
+
+class CurrentToolNotifier extends Notifier<DrawingStyle> {
+  @override
+  DrawingStyle build() => kToolScribble;
+
+  void set(DrawingStyle tool) {
+    state = tool;
+  }
+}
+
+class DrawingLockedNotifier extends Notifier<bool> {
+  @override
+  bool build() => true;
+
+  void lock() {
+    state = true;
+  }
+
+  void unlock() {
+    state = false;
+  }
+}
 
 class NotesProvider extends Notifier<int> {
   static final _logger = Logger('NotesProvider');
 
-  final List<(bool deleted, List<BaseNote> notes)> _undoStack = [];
-  int _undoStackLast = 0;
+  late final UndoStack<BaseNote> undoStack;
 
   @override
   int build() {
+    undoStack = UndoStack<BaseNote>(
+      shouldSave: (note) => note is MapNote || note is MapDrawing,
+      doUpsert: (note) {
+        if (note.isNew) {
+          // restore with a new note id
+          note.id = null;
+        } else {
+          // just remove the flag
+          note.isDeleted = false;
+        }
+        saveNote(note, addUndo: false, notify: false);
+      },
+      doDelete: (note) {
+        deleteNote(note, addUndo: false, notify: false);
+      },
+    );
+
     _checkHaveChangesAndNotify();
     return 0;
   }
@@ -146,7 +193,7 @@ class NotesProvider extends Notifier<int> {
     if (notes.isEmpty) return 0;
 
     // Upload all notes concurrently.
-    ref.read(apiStatusProvider.notifier).state = ApiStatus.uploadingNotes;
+    ref.read(apiStatusProvider.notifier).set(ApiStatus.uploadingNotes);
     try {
       await Future.wait([
         _uploadOsmNotes(notes.whereType<OsmNote>()),
@@ -154,7 +201,7 @@ class NotesProvider extends Notifier<int> {
       ]);
       _checkHaveChangesAndNotify();
     } finally {
-      ref.read(apiStatusProvider.notifier).state = ApiStatus.idle;
+      ref.read(apiStatusProvider.notifier).set(ApiStatus.idle);
     }
     return notes.length;
   }
@@ -354,8 +401,7 @@ class NotesProvider extends Notifier<int> {
     }
 
     // Clear undo buffer.
-    _undoStack.clear();
-    _undoStackLast = 0;
+    undoStack.clear();
   }
 
   Future<List<OsmNote>> _downloadOsmNotes(LatLngBounds bounds) async {
@@ -475,7 +521,7 @@ class NotesProvider extends Notifier<int> {
         note.toJson(),
         conflictAlgorithm: ConflictAlgorithm.replace,
       );
-      if (addUndo) _addToUndoStack([note], false);
+      if (addUndo) undoStack.add([note], false);
     }
     if (notify) _checkHaveChangesAndNotify();
   }
@@ -484,7 +530,7 @@ class NotesProvider extends Notifier<int> {
     _logger.info('Deleting ${notes.length} drawings.');
     for (final note in notes)
       await deleteNote(note, notify: false, addUndo: false);
-    _addToUndoStack(notes, true);
+    undoStack.add(notes, true);
     _checkHaveChangesAndNotify();
   }
 
@@ -503,54 +549,8 @@ class NotesProvider extends Notifier<int> {
         whereArgs: [note.id],
       );
     }
-    if (addUndo) _addToUndoStack([note], true);
+    if (addUndo) undoStack.add([note], true);
     if (notify) _checkHaveChangesAndNotify();
-  }
-
-  bool get undoIsEmpty => _undoStackLast <= 0;
-  bool get redoIsEmpty => _undoStackLast >= _undoStack.length;
-
-  void _addToUndoStack(Iterable<BaseNote> notes, bool deleted) {
-    final toAdd = notes.where((n) => n is MapNote || n is MapDrawing).toList();
-    if (toAdd.isEmpty) return;
-    // Add it to undo stack, discarding the top if needed.
-    if (_undoStackLast < _undoStack.length)
-      _undoStack.removeRange(_undoStackLast, _undoStack.length);
-    _undoStack.add((deleted, toAdd));
-    _undoStackLast += 1;
-  }
-
-  Future<void> _restoreOneChange(BaseNote note, bool deleted) async {
-    if (deleted) {
-      if (note.isNew) {
-        // restore with a new note id
-        note.id = null;
-      } else {
-        // just remove the flag
-        note.isDeleted = false;
-      }
-      await saveNote(note, addUndo: false, notify: false);
-    } else {
-      await deleteNote(note, addUndo: false, notify: false);
-    }
-  }
-
-  Future<void> undoChange() async {
-    if (_undoStackLast <= 0) return;
-    _undoStackLast -= 1;
-    final deleted = _undoStack[_undoStackLast].$1;
-    final notes = _undoStack[_undoStackLast].$2;
-    for (final note in notes) await _restoreOneChange(note, deleted);
-    _checkHaveChangesAndNotify();
-  }
-
-  Future<void> redoChange() async {
-    if (_undoStackLast >= _undoStack.length) return;
-    final deleted = _undoStack[_undoStackLast].$1;
-    final notes = _undoStack[_undoStackLast].$2;
-    _undoStackLast += 1;
-    for (final note in notes) await _restoreOneChange(note, !deleted);
-    _checkHaveChangesAndNotify();
   }
 
   // Useful for undoing notes.
@@ -600,8 +600,7 @@ class NotesProvider extends Notifier<int> {
     }
 
     // Clear undo buffer, since MapDrawings are not removed one by one.
-    _undoStack.clear();
-    _undoStackLast = 0;
+    undoStack.clear();
 
     _checkHaveChangesAndNotify();
   }
@@ -633,5 +632,58 @@ class OwnScribblesController extends Notifier<bool> {
       final prefs = ref.read(sharedPrefsProvider).requireValue;
       await prefs.setBool(kSettingKey, state);
     }
+  }
+}
+
+class UndoStack<T> {
+  final List<(bool deleted, List<T> notes)> _undoStack = [];
+  int _undoStackLast = 0;
+
+  final Function(T note) doUpsert;
+  final Function(T note) doDelete;
+  final bool Function(T note)? shouldSave;
+
+  UndoStack({required this.doUpsert, required this.doDelete, this.shouldSave});
+
+  bool get undoIsEmpty => _undoStackLast <= 0;
+  bool get redoIsEmpty => _undoStackLast >= _undoStack.length;
+
+  void clear() {
+    _undoStack.clear();
+    _undoStackLast = 0;
+  }
+
+  void add(Iterable<T> notes, bool deleted) {
+    final toAdd = notes.where((n) => shouldSave?.call(n) ?? true).toList();
+    if (toAdd.isEmpty) return;
+    // Add it to undo stack, discarding the top if needed.
+    if (_undoStackLast < _undoStack.length)
+      _undoStack.removeRange(_undoStackLast, _undoStack.length);
+    _undoStack.add((deleted, toAdd));
+    _undoStackLast += 1;
+  }
+
+  Future<void> _restoreOneChange(T note, bool deleted) async {
+    if (deleted) {
+      doUpsert(note);
+    } else {
+      doDelete(note);
+    }
+  }
+
+  Future<void> undoChange() async {
+    if (_undoStackLast <= 0) return;
+    _undoStackLast -= 1;
+    final deleted = _undoStack[_undoStackLast].$1;
+    final notes = _undoStack[_undoStackLast].$2;
+    for (final note in notes) await _restoreOneChange(note, deleted);
+  }
+
+  Future<void> redoChange() async {
+    if (_undoStackLast >= _undoStack.length) return;
+    final deleted = _undoStack[_undoStackLast].$1;
+    final notes = _undoStack[_undoStackLast].$2;
+    _undoStackLast += 1;
+    for (final note in notes) await _restoreOneChange(note, !deleted);
   }
 }

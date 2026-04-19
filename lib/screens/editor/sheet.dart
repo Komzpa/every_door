@@ -105,7 +105,7 @@ class _BottomEditorPaneState extends ConsumerState<BottomEditorPane> {
       ref.read(lastPresetsProvider).registerPreset(widget.preset!, fullTags);
     }
     // Save changes and close.
-    final changes = ref.read(changesProvider);
+    final changes = ref.read(changesProvider.notifier);
     changes.saveChange(element);
     saved = true;
     ref.read(needMapUpdateProvider).trigger();
@@ -115,7 +115,7 @@ class _BottomEditorPaneState extends ConsumerState<BottomEditorPane> {
   void deleteAndClose() {
     if (widget.element != null) {
       // No use deleting an amenity that just have been created.
-      final changes = ref.read(changesProvider);
+      final changes = ref.read(changesProvider.notifier);
       if (element.isNew) {
         changes.deleteChange(element);
       } else {

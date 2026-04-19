@@ -295,6 +295,8 @@ class DefaultEntrancesModeDefinition extends EntrancesModeDefinition {
   }
 }
 
+/// Packages button information from a JSON definition. Used only for
+/// simplifying customizing buttons.
 class _ButtonData {
   MultiIcon? icon;
   String? preset;

@@ -296,7 +296,7 @@ class OsmApiHelper {
 
   Future<List<UploadedElement>> _uploadOneByOne(Iterable<OsmChange> allChanges,
       String changeset, Map<String, String> headers) async {
-    final changes = _ref.read(changesProvider);
+    final changes = _ref.read(changesProvider.notifier);
     List<UploadedElement> updates = [];
     for (final change in allChanges) {
       if (change.isNew) {
@@ -434,7 +434,7 @@ class OsmApiHelper {
 
   Future<List<OsmChange>> _updateUnderlyingElements(
       List<OsmChange> changes) async {
-    final changesProv = _ref.read(changesProvider);
+    final changesProv = _ref.read(changesProvider.notifier);
     final elementsToUpdate = Map.fromEntries(changes
         .where((e) => !e.isNew)
         .map((e) => MapEntry(e.element!.id, e.element!)));
@@ -527,7 +527,7 @@ class OsmApiHelper {
           rethrow;
         }
       }
-      final chProv = _ref.read(changesProvider);
+      final chProv = _ref.read(changesProvider.notifier);
       await chProv.clearChanges(includeErrored: clearErrored, ids: changeIds);
       await _updateElementsAfterUpload(updates);
       return updates.length;
@@ -541,7 +541,7 @@ class OsmApiHelper {
   }
 
   Future<int> uploadChanges([bool includeErrored = false]) async {
-    List<OsmChange> changes = _ref.read(changesProvider).all(includeErrored);
+    List<OsmChange> changes = _ref.read(changesProvider.notifier).all(includeErrored);
     if (changes.isEmpty) return 0;
 
     // Check whether we've authorized.
@@ -551,7 +551,7 @@ class OsmApiHelper {
     // Set the mutex.
     if (_ref.read(apiStatusProvider) != ApiStatus.idle)
       throw StateError('API is busy');
-    _ref.read(apiStatusProvider.notifier).state = ApiStatus.uploading;
+    _ref.read(apiStatusProvider.notifier).set(ApiStatus.uploading);
 
     try {
       int count = 0;
@@ -561,7 +561,7 @@ class OsmApiHelper {
       }
       return count;
     } finally {
-      _ref.read(apiStatusProvider.notifier).state = ApiStatus.idle;
+      _ref.read(apiStatusProvider.notifier).set(ApiStatus.idle);
     }
   }
 }

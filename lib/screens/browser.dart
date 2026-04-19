@@ -29,7 +29,7 @@ class _BrowserPageState extends ConsumerState<BrowserPage> {
   bool _canPopScope(bool updateProviders) {
     if (ref.read(microZoomedInProvider) != null) {
       if (updateProviders) {
-        ref.read(microZoomedInProvider.notifier).state = null;
+        ref.read(microZoomedInProvider.notifier).reset();
       }
       return false;
     } else if (!ref.read(trackingProvider) &&
@@ -49,7 +49,7 @@ class _BrowserPageState extends ConsumerState<BrowserPage> {
     final isNavigation = ref.watch(navigationModeProvider);
 
     ref.listen(editorModeProvider, (_, next) {
-      ref.read(microZoomedInProvider.notifier).state = null;
+      ref.read(microZoomedInProvider.notifier).reset();
     });
 
     // Now we have to listen to both providers to change the pop state.

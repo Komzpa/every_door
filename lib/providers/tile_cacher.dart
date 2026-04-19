@@ -72,7 +72,7 @@ class TileCacher extends Notifier<TileCacherState> {
     await _waitUntilImageryLoaded();
     final imagery = ref.read(imageryProvider);
     final base = ref.read(baseImageryProvider);
-    final areas = await ref.read(downloadedAreaProvider).getAllAreas();
+    final areas = await ref.read(downloadedAreaProvider.notifier).getAllAreas();
     _needStop = false;
 
     // First count how many tiles we need to get.

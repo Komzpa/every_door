@@ -15,6 +15,7 @@ import 'package:every_door/providers/location.dart';
 import 'package:every_door/providers/auth.dart';
 import 'package:every_door/providers/osm_data.dart';
 import 'package:every_door/providers/plugin_manager.dart';
+import 'package:every_door/providers/plugin_repo.dart';
 import 'package:every_door/providers/presets.dart';
 import 'package:every_door/providers/shared_file.dart';
 import 'package:every_door/providers/shared_preferences.dart';
@@ -84,7 +85,7 @@ class _LoadingPageState extends ConsumerState<LoadingPage> {
     });
     String? error;
     try {
-      await ref.read(changesProvider).loadChanges();
+      await ref.read(changesProvider.notifier).loadChanges();
     } on Exception catch (e) {
       error = e.toString();
     } on Error catch (e) {
@@ -98,10 +99,10 @@ class _LoadingPageState extends ConsumerState<LoadingPage> {
     setState(() {
       message = "Loading plugins";
     });
-    ref.read(pluginManagerProvider);
+    ref.read(pluginRepositoryProvider);
 
     // Update floors in the background.
-    ref.read(osmDataProvider).updateAddressesWithFloors();
+    ref.read(osmDataProvider.notifier).updateAddressesWithFloors();
 
     // Acquire user location.
     setState(() {

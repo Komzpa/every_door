@@ -2,6 +2,7 @@
 // This file is a part of Every Door, distributed under GPL v3 or later version.
 // Refer to LICENSE file and https://www.gnu.org/licenses/gpl-3.0.html for details.
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:logging/logging.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:shared_preferences/util/legacy_to_async_migration_util.dart';
 
@@ -11,6 +12,14 @@ final sharedPrefsProvider = FutureProvider<SharedPreferencesWithCache>(
 
 Future<void> migrateSharedPreferences() async {
   final SharedPreferences prefs = await SharedPreferences.getInstance();
+
+  // TODO: remove debug when we find out why it's being cleared time to time.
+  final sharedPreferencesAsyncInstance = SharedPreferencesAsync(
+    options: SharedPreferencesOptions(),
+  );
+  final k = await sharedPreferencesAsyncInstance.containsKey('spMigrationCompleted');
+  Logger('sharedPrefsProvider').info('SP migration: $k');
+
   await migrateLegacySharedPreferencesToSharedPreferencesAsyncIfNecessary(
     legacySharedPreferencesInstance: prefs,
     sharedPreferencesAsyncOptions: SharedPreferencesOptions(),

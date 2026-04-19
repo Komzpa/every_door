@@ -93,7 +93,7 @@ class _ChangeListPageState extends ConsumerState {
   }
 
   Future<void> downloadChanges(WidgetRef ref) async {
-    final changes = ref.watch(changesProvider);
+    final changes = ref.watch(changesProvider.notifier);
     final changeList = changes.all();
     String changeset =
         ref.read(osmApiProvider).buildOsmChange(changeList, null);
@@ -113,7 +113,7 @@ class _ChangeListPageState extends ConsumerState {
 
   Future<void> buildChangesList() async {
     final loc = AppLocalizations.of(context)!;
-    final changes = ref.read(changesProvider);
+    final changes = ref.read(changesProvider.notifier);
     final changesList = changes.all();
     changesList.sort((a, b) => b.updated.compareTo(a.updated));
 
@@ -151,7 +151,7 @@ class _ChangeListPageState extends ConsumerState {
   void _deleteChange(BuildContext context, int index) {
     final loc = AppLocalizations.of(context)!;
     final change = _changeList[index];
-    final chProvider = ref.read(changesProvider);
+    final chProvider = ref.read(changesProvider.notifier);
     final nProvider = ref.read(notesProvider.notifier);
     if (change.change != null) {
       chProvider.deleteChange(change.change!);
@@ -184,7 +184,7 @@ class _ChangeListPageState extends ConsumerState {
 
   @override
   Widget build(BuildContext context) {
-    final changes = ref.watch(changesProvider);
+    final changes = ref.watch(changesProvider.notifier);
     final loc = AppLocalizations.of(context)!;
 
     ref.listen(changesProvider, (previous, next) {
@@ -222,7 +222,7 @@ class _ChangeListPageState extends ConsumerState {
                       );
                       if (answer == OkCancelResult.ok) {
                         ref
-                            .read(changesProvider)
+                            .read(changesProvider.notifier)
                             .clearChanges(includeErrored: true);
                         ref.read(needMapUpdateProvider).trigger();
                       }

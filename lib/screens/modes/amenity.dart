@@ -146,7 +146,7 @@ class _AmenityPageState extends ConsumerState<AmenityPane> {
           describer: widget.def.describer,
           getAmenityData: widget.def.getAmenityData,
           onTap: (amenity) {
-            ref.read(microZoomedInProvider.notifier).state = null;
+            ref.read(microZoomedInProvider.notifier).reset();
             widget.def.openEditor(context: context, element: amenity);
           },
         ),

@@ -16,8 +16,34 @@ final editorModeProvider =
     NotifierProvider<EditorModeController, BaseModeDefinition>(
         EditorModeController.new);
 
-final microZoomedInProvider = StateProvider<LatLngBounds?>((_) => null);
-final navigationModeProvider = StateProvider<bool>((ref) => false);
+final microZoomedInProvider = NotifierProvider<MicroZoomNotifier, LatLngBounds?>(MicroZoomNotifier.new);
+final navigationModeProvider = NotifierProvider<NavigationModeNotifier, bool>(NavigationModeNotifier.new);
+
+class MicroZoomNotifier extends Notifier<LatLngBounds?> {
+  @override
+  LatLngBounds? build() => null;
+
+  void set(LatLngBounds bounds) {
+    state = bounds;
+  }
+
+  void reset() {
+    state = null;
+  }
+}
+
+class NavigationModeNotifier extends Notifier<bool> {
+  @override
+  bool build() => false;
+
+  void enable() {
+    state = true;
+  }
+
+  void disable() {
+    state = false;
+  }
+}
 
 class EditorModeController extends Notifier<BaseModeDefinition> {
   static const kModeKey = 'micromappingMode';
